@@ -28,7 +28,12 @@ import requests
 
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY")
 LINE_CHANNEL_ACCESS_TOKEN = os.environ.get("LINE_CHANNEL_ACCESS_TOKEN")
-LINE_TARGET_ID = os.environ.get("LINE_TARGET_ID")
+# 配信先LINEユーザーID(複数人対応)
+LINE_TARGET_ID = os.environ.get("LINE_TARGET_ID", "").strip()
+LINE_TARGET_ID_2 = os.environ.get("LINE_TARGET_ID_2", "").strip()
+LINE_TARGET_ID_3 = os.environ.get("LINE_TARGET_ID_3", "").strip()
+# 全配信先IDのリスト(空でないものだけ)
+LINE_TARGET_IDS = [tid for tid in [LINE_TARGET_ID, LINE_TARGET_ID_2, LINE_TARGET_ID_3] if tid]
 
 # 申込URL: GitHub Secretsから取得、なければ既定値を使う
 DEFAULT_APPLY_URL_SHIGYO = "https://docs.google.com/forms/d/e/1FAIpQLSd3MfH4rxJhMdJrrFdnJ38kA1HgP8VCIIpHlxhJQ92IuhxBhQ/viewform"
@@ -863,7 +868,7 @@ def build_image_url(prompt, seed=None):
 # ============================================================
 
 def compose_messages(article, shigyo, slot, image_url, now=None):
-    """Returns a list of LINE message objects (image + 4 text blocks)."""
+    """Returns a list of LINE message objects (4 text blocks, no images)."""
     if now is None:
         now = datetime.now(timezone(timedelta(hours=9)))
     if slot == "morning":
@@ -899,22 +904,23 @@ def compose_messages(article, shigyo, slot, image_url, now=None):
 👇 お申込みはこちら
 {APPLY_URLS_BLOCK}"""
 
-    # ----- Twitter (header情報を冒頭に統合してメッセージ数を節約) -----
-    if FLYER_IMAGE_URL:
-        # チラシも添付するため、headerメッセージを省略しX冒頭に統合
-        twitter_msg = f"""{slot_emoji} {slot_label} SNS投稿セット
+    # ----- Header (overview) -----
+    header = f"""{slot_emoji} {slot_label} SNS投稿セット
 ━━━━━━━━━━━━━━━
-📰 {news_title}
+
+📰 フックに使うニュース・話題
+{news_title}
+
 📎 出典: {source_name}
 {source_url}
+
 ━━━━━━━━━━━━━━━
+このあと X / Instagram / Facebook 用の
+投稿が順に届きます👇 各投稿をコピペして
+SNSに貼り付けてご利用ください。"""
 
-𝕏  X(Twitter)用 ({len(twitter_text)}字)
-※ AI画像 + チラシの2枚を添付推奨
-
-{twitter_text}"""
-    else:
-        twitter_msg = f"""━━━━━━━━━━━━━━━
+    # ----- Twitter -----
+    twitter_msg = f"""━━━━━━━━━━━━━━━
 𝕏  X(Twitter)用 ({len(twitter_text)}字)
 ━━━━━━━━━━━━━━━
 
@@ -943,49 +949,13 @@ def compose_messages(article, shigyo, slot, image_url, now=None):
     def trim(text):
         return text if len(text) <= 4900 else text[:4850] + "...(以下省略)"
 
-    # ----- メッセージ構成 -----
-    if FLYER_IMAGE_URL:
-        # 2画像 + 3テキスト = 5メッセージ
-        messages = [
-            {
-                "type": "image",
-                "originalContentUrl": image_url,
-                "previewImageUrl": image_url,
-            },
-            {
-                "type": "image",
-                "originalContentUrl": FLYER_IMAGE_URL,
-                "previewImageUrl": FLYER_IMAGE_URL,
-            },
-            {"type": "text", "text": trim(twitter_msg)},
-            {"type": "text", "text": trim(instagram_msg)},
-            {"type": "text", "text": trim(facebook_msg)},
-        ]
-    else:
-        # 1画像 + 4テキスト = 5メッセージ
-        header = f"""{slot_emoji} {slot_label} SNS投稿セット
-━━━━━━━━━━━━━━━
-
-📰 フックに使うニュース・話題
-{news_title}
-
-📎 出典: {source_name}
-{source_url}
-
-━━━━━━━━━━━━━━━
-このあと X / Instagram / Facebook 用の
-投稿が順に届きます👇"""
-        messages = [
-            {
-                "type": "image",
-                "originalContentUrl": image_url,
-                "previewImageUrl": image_url,
-            },
-            {"type": "text", "text": trim(header)},
-            {"type": "text", "text": trim(twitter_msg)},
-            {"type": "text", "text": trim(instagram_msg)},
-            {"type": "text", "text": trim(facebook_msg)},
-        ]
+    # 4テキストメッセージのみ(画像なし)
+    messages = [
+        {"type": "text", "text": trim(header)},
+        {"type": "text", "text": trim(twitter_msg)},
+        {"type": "text", "text": trim(instagram_msg)},
+        {"type": "text", "text": trim(facebook_msg)},
+    ]
     return messages
 
 
@@ -994,23 +964,27 @@ def compose_messages(article, shigyo, slot, image_url, now=None):
 # ============================================================
 
 def send_to_line(messages):
-    if not LINE_CHANNEL_ACCESS_TOKEN or not LINE_TARGET_ID:
-        raise RuntimeError("LINE credentials not configured")
+    if not LINE_CHANNEL_ACCESS_TOKEN:
+        raise RuntimeError("LINE_CHANNEL_ACCESS_TOKEN not configured")
+    if not LINE_TARGET_IDS:
+        raise RuntimeError("LINE_TARGET_ID(s) not configured")
 
     headers = {
         "Authorization": f"Bearer {LINE_CHANNEL_ACCESS_TOKEN}",
         "Content-Type": "application/json",
     }
-    payload = {"to": LINE_TARGET_ID, "messages": messages[:5]}
 
-    print(f"[INFO] Pushing {len(payload['messages'])} messages to LINE...")
+    # multicast APIで複数人に同時送信(最大500人まで対応)
+    payload = {"to": LINE_TARGET_IDS, "messages": messages[:5]}
+
+    print(f"[INFO] Pushing {len(payload['messages'])} messages to {len(LINE_TARGET_IDS)} recipient(s)...")
     r = requests.post(
-        "https://api.line.me/v2/bot/message/push",
+        "https://api.line.me/v2/bot/message/multicast",
         headers=headers, json=payload, timeout=30,
     )
     if r.status_code != 200:
         raise RuntimeError(f"LINE API error {r.status_code}: {r.text[:500]}")
-    print("[OK] Sent to LINE")
+    print(f"[OK] Sent to LINE ({len(LINE_TARGET_IDS)} recipient(s))")
 
 
 # ============================================================
@@ -1025,9 +999,7 @@ def main():
     # デバッグ: URL設定の確認
     print(f"[DEBUG] APPLY_URL_SHIGYO  exists: {bool(APPLY_URL_SHIGYO)}, length: {len(APPLY_URL_SHIGYO)}")
     print(f"[DEBUG] APPLY_URL_GENERAL exists: {bool(APPLY_URL_GENERAL)}, length: {len(APPLY_URL_GENERAL)}")
-    print(f"[DEBUG] APPLY_URL_SHIGYO  starts: {APPLY_URL_SHIGYO[:30] if APPLY_URL_SHIGYO else '(empty)'}")
-    print(f"[DEBUG] APPLY_URL_GENERAL starts: {APPLY_URL_GENERAL[:30] if APPLY_URL_GENERAL else '(empty)'}")
-    print(f"[DEBUG] FLYER_IMAGE_URL   length: {len(FLYER_IMAGE_URL)}")
+    print(f"[DEBUG] LINE_TARGET_IDS count: {len(LINE_TARGET_IDS)}")
 
     article = call_claude(shigyo, slot, now)
     print(f"[INFO] News: {article.get('news_title')}")
