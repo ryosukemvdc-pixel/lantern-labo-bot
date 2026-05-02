@@ -2,8 +2,12 @@ name: Lantern LABO Daily Post
 
 on:
   schedule:
+    # GitHub Actions cron runs in UTC. JST = UTC+9.
+    # 朝8時 JST = 23:00 UTC (前日)
     - cron: "0 23 * * *"
+    # 昼12時 JST = 03:00 UTC
     - cron: "0 3 * * *"
+    # 夕方17時 JST = 08:00 UTC
     - cron: "0 8 * * *"
   workflow_dispatch:
     inputs:
@@ -55,8 +59,10 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
           LINE_TARGET_ID: ${{ secrets.LINE_TARGET_ID }}
-          APPLY_URL: ${{ secrets.APPLY_URL }}
-          EVENT_DETAILS: ${{ secrets.EVENT_DETAILS }}
+          LINE_TARGET_ID_2: ${{ secrets.LINE_TARGET_ID_2 }}
+          LINE_TARGET_ID_3: ${{ secrets.LINE_TARGET_ID_3 }}
+          APPLY_URL_SHIGYO: ${{ secrets.APPLY_URL_SHIGYO }}
+          APPLY_URL_GENERAL: ${{ secrets.APPLY_URL_GENERAL }}
           FLYER_IMAGE_URL: ${{ secrets.FLYER_IMAGE_URL }}
           SLOT: ${{ steps.slot.outputs.slot }}
           DRY_RUN: ${{ steps.slot.outputs.dry_run }}
