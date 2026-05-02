@@ -423,6 +423,16 @@ news/最新ニュースは「問題提起のフック」として使い、本題
    - "本気で遊び、本気で学ぶ"がコンセプト
 4. 【CTA】具体的な日時・会場・参加費・申込URL
 
+【文中の装飾記号の禁止 - 重要】
+本文中で以下の記号を**装飾目的**で使うのは禁止です。SNS投稿に直接ペーストされて表示が崩れます。
+- ❌ `**太字**` のようなマークダウン記法(アスタリスクで囲む)
+- ❌ 文中の `*` 単独使用(箇条書き目的)
+- ❌ `__下線__` のようなアンダースコア装飾
+- ❌ `# 見出し` のようなマークダウン見出し記号(本文先頭)
+- ✅ 強調したい時は「」『』で囲む、または絵文字を使う
+- ✅ 箇条書きは「・」「◆」「✅」「→」などの全角記号や絵文字を使う
+- ✅ ハッシュタグ用の `#` は **末尾のハッシュタグ部分でのみ** 使用OK
+
 【申込URLの扱い - 重要】
 申込URLは士業用と一般用の2種類があり、コード側で自動的に投稿末尾に追加されます。
 **本文中にURL文字列(例: https://〜)を絶対に書かないでください。**
@@ -496,23 +506,25 @@ news/最新ニュースは「問題提起のフック」として使い、本題
 - ハッシュタグ5-8個
 
 【4. 画像プロンプト(英語)】
-記事内容に合った、本物の写真に見えるリアルな画像をPollinations.aiで生成するプロンプトを英語で作成。
-**AIっぽさを徹底的に排除すること。** 以下のテクニックを必ず使用:
-- **被写体は若手士業を中心に**: "young Japanese professional in late 20s to mid 30s",
-   "young tax accountant / lawyer / consultant", "fresh-faced ambitious professional"
-   (年齢を感じさせる表現は避け、「若手・新世代」感を強く打ち出す)
+**人物は写さない**でください(顔の表情で印象が変わるリスクを避け、清潔感のある抽象的シーンを優先)。
+「繋がり・温かみ・明るさ・前向きさ」を象徴する写真を、本物の写真に見えるように生成。
+**AIっぽさを徹底排除**。以下のテクニックを必ず使用:
+- **構図テーマ(人物なし)**: 以下から記事内容に合うものを選ぶ
+   - "warm Japanese paper lantern (washi lamp) glowing softly in modern office, dusk window light"
+   - "two coffee mugs on minimalist wooden cafe table, hands of two people meeting (cropped above wrist, no face)"
+   - "blurred warm city lights at dusk, modern Tokyo office window reflection"
+   - "open notebook with pen, soft natural daylight, warm cream tones"
+   - "modern Japanese conference room, empty chairs arranged in a circle, soft afternoon light"
+   - "glowing warm-toned lantern paper craft on wooden surface, shallow depth"
+   - "cozy meeting space interior, plants and books, warm window light"
 - カメラ・フィルム指定: "Shot on Fujifilm X100V, 35mm, Provia film stock, slight film grain"
-   または "Canon AE-1, Kodak Portra 400, 50mm" など
-- ドキュメンタリー調: "candid documentary photography", "photojournalism style"
-- 日常感・生活感: "ordinary office details, modern minimal desk, laptop and notepad, coffee mug"
-- 自然光: "natural diffused daylight" / "overcast window light" / "fluorescent office lighting"
+- ドキュメンタリー調: "candid still life photography, photojournalism style"
+- 自然光: "natural diffused daylight" / "warm afternoon glow" / "soft window light"
    (× cinematic, × dramatic, × epic, × glowing は禁止ワード)
-- 構図: "off-center composition", "asymmetric framing", "imperfect angle"
-- 不完全さ: "natural skin texture", "slight motion blur", "subject unaware of camera"
-- 服装: "modern business casual", "smart casual attire" (堅すぎないスーツ)
+- 構図: "off-center composition", "asymmetric framing"
+- 不完全さ: "natural texture, ordinary moment, slight imperfections"
 - 60〜90語以内、英語のみ
-- シーン例: 若手税理士がノートPCで通達原文を読み込む / 若手弁護士が同僚と立ち話 /
-   若手社労士がスマホで助成金情報をチェック など、「明るく前向きで挑戦している若手」を感じさせる構図
+- 「明るい」「前向き」「温かい」「繋がり」「学び」を感じさせるシンボリックな構図を選ぶ
 
 【出力形式 - 重要】
 **必ず submit_sns_posts ツールを呼び出して結果を返してください。**
@@ -574,6 +586,15 @@ def _build_noon_prompt(shigyo, now, date_str):
 4. 【ソフト誘導】「こういう話、6/19のらんたんLABOで他の士業と話してみません?」
 5. 【CTA】定型のイベント情報
 
+【文中の装飾記号の禁止 - 重要】
+本文中で以下の記号を**装飾目的**で使うのは禁止です。SNS投稿に直接ペーストされて表示が崩れます。
+- ❌ `**太字**` のようなマークダウン記法(アスタリスクで囲む)
+- ❌ 文中の `*` 単独使用
+- ❌ `# 見出し` のようなマークダウン見出し記号
+- ✅ 強調は「」『』で囲む、または絵文字
+- ✅ 箇条書きは「・」「◆」「✅」「→」などの全角記号や絵文字
+- ✅ ハッシュタグ用の `#` は末尾のハッシュタグ部分でのみOK
+
 【らんたんLABO Opening Session 詳細】
 - 日時: {EVENT_INFO["date"]}
 - 会場: {EVENT_INFO["venue"]} ({EVENT_INFO["venue_address"]})
@@ -627,19 +648,21 @@ def _build_noon_prompt(shigyo, now, date_str):
 - イベント誘導は文末で軽く
 
 【4. 画像プロンプト(英語)】
-ランチタイムらしい温かい画像。**AIっぽさを徹底排除**。以下のテクニックを必ず使用:
-- **被写体は若手士業を中心に**: "young Japanese professional in late 20s to mid 30s",
-   "young office worker on lunch break", "fresh-faced ambitious professional"
+**人物は写さない**でください。ランチタイムらしい温かい雰囲気の象徴的な静物・空間写真を生成。
+**AIっぽさを徹底排除**。以下のテクニックを必ず使用:
+- **構図テーマ(人物なし)**: 以下から記事内容に合うものを選ぶ
+   - "Japanese bento box on wooden cafe table, soft midday light, warm tones"
+   - "steaming coffee cup beside open laptop, blurred cozy cafe interior"
+   - "Japanese lunch set with chopsticks on natural wooden table, soft window light"
+   - "warm Japanese paper lantern in cafe corner, plants nearby, midday glow"
+   - "modern minimal Tokyo cafe interior, empty chair, plants, soft natural light"
 - カメラ・フィルム指定: "Shot on Fujifilm X100V, 35mm, Provia film stock, slight grain"
-- ドキュメンタリー調: "candid lifestyle photography, snapshot moment"
-- 生活感: "everyday Tokyo cafe, ordinary bento box, used coffee cup, slight imperfections"
+- ドキュメンタリー調: "candid still life photography, snapshot moment"
 - 自然光: "natural midday light" / "soft window light" (× cinematic, × dramatic は禁止)
-- 構図: "off-center composition", "subject unaware", "casual angle"
-- 服装: "modern business casual", "smart casual attire"
-- 不完全さ: "natural texture, ordinary moment, no perfect lighting"
+- 構図: "off-center composition", "asymmetric framing"
+- 不完全さ: "natural texture, ordinary moment, slight imperfections"
 - 60〜90語以内、英語のみ
-- シーン例: 若手士業がランチ中にスマホをチラ見 / カフェで弁当を開ける若手 /
-   ランチ中に同僚と笑顔で話す若手など
+- 「ほっと一息」「温かい」「日常の小さな幸せ」を感じさせる構図
 
 【出力形式 - 重要】
 **必ず submit_sns_posts ツールを呼び出して結果を返してください。**
@@ -649,6 +672,28 @@ def _build_noon_prompt(shigyo, now, date_str):
 """
     return prompt
 
+
+
+def _strip_markdown(text):
+    """
+    本文中のマークダウン装飾記号を除去する。
+    SNSにそのまま貼り付けても崩れないようにするため。
+    末尾のハッシュタグ用の # は残す(行頭の # 見出しのみ除去)。
+    """
+    if not text:
+        return text
+    import re
+    # **太字** → そのまま中身だけ残す
+    text = re.sub(r"\*\*(.+?)\*\*", r"\1", text)
+    # __下線__ → そのまま中身だけ残す
+    text = re.sub(r"__(.+?)__", r"\1", text)
+    # 行頭の "# " "## " "### " などのMarkdown見出しを除去
+    text = re.sub(r"^#{1,6}\s+", "", text, flags=re.MULTILINE)
+    # 行頭または空白後の単独 * (箇条書き) を「・」に置換
+    text = re.sub(r"(^|\n)\s*\*\s+", r"\1・ ", text)
+    # 残った半角・全角の単独 * (装飾用に使われがち)を除去
+    text = text.replace(" *", " ").replace("* ", " ")
+    return text
 
 
 def call_claude(shigyo, slot, now):
@@ -787,9 +832,9 @@ def compose_messages(article, shigyo, slot, image_url, now=None):
         slot_emoji = "🌙"
         slot_label = f"今夕の{shigyo['name']}向け"
 
-    twitter_text = article.get("twitter", "").strip()
-    instagram_text = article.get("instagram", "").strip()
-    facebook_text = article.get("facebook", "").strip()
+    twitter_text = _strip_markdown(article.get("twitter", "").strip())
+    instagram_text = _strip_markdown(article.get("instagram", "").strip())
+    facebook_text = _strip_markdown(article.get("facebook", "").strip())
     source_name = article.get("source_name", "").strip()
     source_url = article.get("source_url", "").strip()
     news_title = article.get("news_title", "").strip()
