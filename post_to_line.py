@@ -676,13 +676,17 @@ def _build_noon_prompt(shigyo, now, date_str):
 
 def _strip_markdown(text):
     """
-    本文中のマークダウン装飾記号を除去する。
+    本文中のマークダウン装飾記号と引用タグを除去する。
     SNSにそのまま貼り付けても崩れないようにするため。
     末尾のハッシュタグ用の # は残す(行頭の # 見出しのみ除去)。
     """
     if not text:
         return text
     import re
+    # <cite index="...">中身</cite> → 中身だけ残す(Claudeのweb_search引用タグ)
+    text = re.sub(r"<cite[^>]*>(.*?)</cite>", r"\1", text, flags=re.DOTALL)
+    # その他のHTMLタグ全般を除去
+    text = re.sub(r"<[^>]+>", "", text)
     # **太字** → そのまま中身だけ残す
     text = re.sub(r"\*\*(.+?)\*\*", r"\1", text)
     # __下線__ → そのまま中身だけ残す
