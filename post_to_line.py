@@ -28,13 +28,76 @@ import requests
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY")
 LINE_CHANNEL_ACCESS_TOKEN = os.environ.get("LINE_CHANNEL_ACCESS_TOKEN")
 LINE_TARGET_ID = os.environ.get("LINE_TARGET_ID")
-APPLY_URL = os.environ.get("APPLY_URL", "https://lantern-labo.com/apply")
+# 士業向け申込URLと一般向け申込URL
+APPLY_URL_SHIGYO = os.environ.get("APPLY_URL_SHIGYO", "").strip()
+APPLY_URL_GENERAL = os.environ.get("APPLY_URL_GENERAL", "").strip()
+# 後方互換: APPLY_URL のみ設定された場合は両方に使う
+_legacy_apply_url = os.environ.get("APPLY_URL", "https://lantern-labo.com/apply").strip()
+if not APPLY_URL_SHIGYO:
+    APPLY_URL_SHIGYO = _legacy_apply_url
+if not APPLY_URL_GENERAL:
+    APPLY_URL_GENERAL = _legacy_apply_url
+
+# プロンプトや本文に埋め込むために整形した「2つのURL」ブロック
+APPLY_URLS_BLOCK = f"""🏢 士業の方:
+{APPLY_URL_SHIGYO}
+
+👤 一般の方:
+{APPLY_URL_GENERAL}"""
+
 # イベントチラシのHTTPS画像URL(任意)
-# 例: https://raw.githubusercontent.com/USER/REPO/main/assets/flyer-1.png
 FLYER_IMAGE_URL = os.environ.get("FLYER_IMAGE_URL", "").strip()
 
 SLOT = os.environ.get("SLOT", "auto")
 DRY_RUN = os.environ.get("DRY_RUN", "false").lower() == "true"
+
+# ============================================================
+# Event Countdown
+# ============================================================
+
+EVENT_DATE = datetime(2026, 6, 19, 18, 0, tzinfo=timezone(timedelta(hours=9)))
+
+
+def get_countdown_message(now=None):
+    """イベントまでのカウントダウンメッセージを生成"""
+    if now is None:
+        now = datetime.now(timezone(timedelta(hours=9)))
+
+    delta = EVENT_DATE - now
+    days = delta.days
+
+    # イベント当日(その日のうち)
+    if 0 <= days < 1 and now.date() == EVENT_DATE.date():
+        if delta.total_seconds() > 0:
+            hours = int(delta.total_seconds() // 3600)
+            if hours <= 0:
+                return "🎉 本日まもなく開催!会場でお待ちしています!"
+            return f"🎉 本日開催!START まで あと {hours} 時間!"
+        return "🎉 開催中!"
+
+    # 翌日に開催
+    if days == 0 or (days == 1 and now.hour >= 18):
+        return "⏰ いよいよ明日開催!お申込みは本日中に!"
+
+    # 数日前まで
+    if 1 <= days <= 3:
+        return f"🔥 あと {days} 日!残席わずか、お早めに!"
+
+    if 4 <= days <= 7:
+        return f"⏰ 開催まで あと {days} 日!"
+
+    if 8 <= days <= 30:
+        return f"🏮 開催まで あと {days} 日!"
+
+    if 31 <= days <= 90:
+        return f"🏮 開催まで あと {days} 日"
+
+    # 90日より先
+    if days > 90:
+        return f"📅 {EVENT_DATE.month}/{EVENT_DATE.day} 開催 (あと {days} 日)"
+
+    # イベント終了後
+    return None  # Noneの場合はカウントダウン非表示
 
 # ============================================================
 # Event Information (used in every post)
@@ -331,6 +394,7 @@ def build_prompt(shigyo, slot, now):
 
     g1 = EVENT_INFO["guest_1"]
     g2 = EVENT_INFO["guest_2"]
+    countdown_for_prompt = get_countdown_message(now) or "(イベント終了済み)"
 
     prompt = f"""本日({date_str} {slot_label})の{shigyo["name"]}向けSNS投稿セットを生成してください。
 
@@ -361,6 +425,13 @@ news/最新ニュースは「問題提起のフック」として使い、本題
    - "本気で遊び、本気で学ぶ"がコンセプト
 4. 【CTA】具体的な日時・会場・参加費・申込URL
 
+【申込URLの扱い】
+申込URLは士業用と一般用の2種類があります。
+- X(Twitter)用: 文字数制限のため、士業用URLのみを書くか、「リンクは画像に記載」などと書いて省略してOK
+- Instagram用: 「プロフィールのリンクから」と書くか、または投稿内に両方のURLを明記してOK
+- Facebook用: 投稿の最後に両方のURLを明記すること(士業の方/一般の方を分けて)
+※ コードで自動的に投稿末尾に両方のURLを追加するため、本文中にURLを必須で書く必要はないが、文脈上自然な誘導文(「お申込みはこちら↓」など)を入れること
+
 【らんたんLABO Opening Session 詳細】
 - 日時: {EVENT_INFO["date"]}
 - 会場: {EVENT_INFO["venue"]} ({EVENT_INFO["venue_address"]})
@@ -368,7 +439,17 @@ news/最新ニュースは「問題提起のフック」として使い、本題
 - テーマ: {EVENT_INFO["themes"]}
 - 参加費: 士業 {EVENT_INFO["fee_shigyo"]} / 一般 {EVENT_INFO["fee_general"]}
 - 主催: {EVENT_INFO["organizer"]} ({EVENT_INFO["leaders"]})
-- 申込URL: {APPLY_URL}
+- 申込URL(士業): {APPLY_URL_SHIGYO}
+- 申込URL(一般): {APPLY_URL_GENERAL}
+- **本日時点でのイベントまでのカウントダウン**: {countdown_for_prompt}
+
+【カウントダウンの活用】
+本文の中にもカウントダウン情報を自然に織り込んでください。
+- 31日以上前: "6/19のイベントまで「あと◯日」" のように軽く触れる
+- 1ヶ月前くらい: "いよいよ来月!" "あと◯日でついに" など期待感を煽る
+- 1週間前: "残り◯日!" "席埋まってきています!" など緊迫感を出す
+- 数日前: "あと◯日!" "もう間に合わなくなる前に!" など強い緊迫感
+- 当日・前日: "本日開催!" "いよいよ明日!" など最終呼びかけ
 
 【ゲスト1: {g1["name"]}】
 - 肩書: {g1["title"]}
@@ -461,6 +542,7 @@ def _build_noon_prompt(shigyo, now, date_str):
 
     g1 = EVENT_INFO["guest_1"]
     g2 = EVENT_INFO["guest_2"]
+    countdown_for_prompt = get_countdown_message(now) or "(イベント終了済み)"
 
     prompt = f"""本日({date_str} お昼)のランチタイム配信用 SNS投稿セットを生成してください。
 
@@ -511,7 +593,17 @@ def _build_noon_prompt(shigyo, now, date_str):
 - テーマ: {EVENT_INFO["themes"]}
 - 参加費: 士業 {EVENT_INFO["fee_shigyo"]} / 一般 {EVENT_INFO["fee_general"]}
 - 主催: {EVENT_INFO["organizer"]} ({EVENT_INFO["leaders"]})
-- 申込URL: {APPLY_URL}
+- 申込URL(士業): {APPLY_URL_SHIGYO}
+- 申込URL(一般): {APPLY_URL_GENERAL}
+- **本日時点でのイベントまでのカウントダウン**: {countdown_for_prompt}
+
+【カウントダウンの活用】
+本文の中にもカウントダウン情報を自然に織り込んでください。
+- 31日以上前: "6/19のイベントまで「あと◯日」" のように軽く触れる
+- 1ヶ月前くらい: "いよいよ来月!" "あと◯日でついに" など期待感を煽る
+- 1週間前: "残り◯日!" "席埋まってきています!" など緊迫感を出す
+- 数日前: "あと◯日!" "もう間に合わなくなる前に!" など強い緊迫感
+- 当日・前日: "本日開催!" "いよいよ明日!" など最終呼びかけ
 
 【ゲスト1: {g1["name"]}】
 - 肩書: {g1["title"]}
@@ -654,8 +746,10 @@ def build_image_url(prompt, seed=None):
 # Compose LINE messages — separate text per platform
 # ============================================================
 
-def compose_messages(article, shigyo, slot, image_url):
+def compose_messages(article, shigyo, slot, image_url, now=None):
     """Returns a list of LINE message objects (image + 4 text blocks)."""
+    if now is None:
+        now = datetime.now(timezone(timedelta(hours=9)))
     if slot == "morning":
         slot_emoji = "☀️"
         slot_label = f"今朝の{shigyo['name']}向け"
@@ -673,8 +767,11 @@ def compose_messages(article, shigyo, slot, image_url):
     source_url = article.get("source_url", "").strip()
     news_title = article.get("news_title", "").strip()
 
+    countdown = get_countdown_message(now)
+    countdown_line = f"\n{countdown}\n" if countdown else ""
+
     event_block = f"""【らんたんLABO Opening Session】
-🏮 {EVENT_INFO["tagline"]}
+🏮 {EVENT_INFO["tagline"]}{countdown_line}
 📅 {EVENT_INFO["date"]}
 📍 {EVENT_INFO["venue"]}
 🎤 ゲスト:
@@ -682,8 +779,9 @@ def compose_messages(article, shigyo, slot, image_url):
    ・{EVENT_INFO["guest_2"]["name"]} (落語作家)
 🎯 テーマ: {EVENT_INFO["themes"]}
 💴 士業 {EVENT_INFO["fee_shigyo"]} / 一般 {EVENT_INFO["fee_general"]}
+
 👇 お申込みはこちら
-{APPLY_URL}"""
+{APPLY_URLS_BLOCK}"""
 
     # ----- Twitter (header情報を冒頭に統合してメッセージ数を節約) -----
     if FLYER_IMAGE_URL:
@@ -819,7 +917,7 @@ def main():
     image_url = build_image_url(article["image_prompt"])
     print(f"[INFO] Image URL: {image_url}")
 
-    messages = compose_messages(article, shigyo, slot, image_url)
+    messages = compose_messages(article, shigyo, slot, image_url, now)
 
     print("\n========== Composed Messages ==========")
     for i, msg in enumerate(messages, 1):
