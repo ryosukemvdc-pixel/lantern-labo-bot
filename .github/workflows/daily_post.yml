@@ -1,0 +1,63 @@
+name: Lantern LABO Daily Post
+
+on:
+  schedule:
+    - cron: "0 23 * * *"
+    - cron: "0 3 * * *"
+    - cron: "0 8 * * *"
+  workflow_dispatch:
+    inputs:
+      slot:
+        description: "morning / noon / evening / auto"
+        required: false
+        default: "auto"
+      dry_run:
+        description: "true で LINE送信せずプレビューのみ"
+        required: false
+        default: "false"
+
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Determine slot from cron schedule
+        id: slot
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "slot=${{ github.event.inputs.slot }}" >> $GITHUB_OUTPUT
+            echo "dry_run=${{ github.event.inputs.dry_run }}" >> $GITHUB_OUTPUT
+          elif [ "${{ github.event.schedule }}" = "0 23 * * *" ]; then
+            echo "slot=morning" >> $GITHUB_OUTPUT
+            echo "dry_run=false" >> $GITHUB_OUTPUT
+          elif [ "${{ github.event.schedule }}" = "0 3 * * *" ]; then
+            echo "slot=noon" >> $GITHUB_OUTPUT
+            echo "dry_run=false" >> $GITHUB_OUTPUT
+          else
+            echo "slot=evening" >> $GITHUB_OUTPUT
+            echo "dry_run=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Run posting script
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
+          LINE_TARGET_ID: ${{ secrets.LINE_TARGET_ID }}
+          APPLY_URL: ${{ secrets.APPLY_URL }}
+          EVENT_DETAILS: ${{ secrets.EVENT_DETAILS }}
+          FLYER_IMAGE_URL: ${{ secrets.FLYER_IMAGE_URL }}
+          SLOT: ${{ steps.slot.outputs.slot }}
+          DRY_RUN: ${{ steps.slot.outputs.dry_run }}
+        run: python post_to_line.py
