@@ -28,15 +28,13 @@ import requests
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY")
 LINE_CHANNEL_ACCESS_TOKEN = os.environ.get("LINE_CHANNEL_ACCESS_TOKEN")
 LINE_TARGET_ID = os.environ.get("LINE_TARGET_ID")
-# 士業向け申込URLと一般向け申込URL
-APPLY_URL_SHIGYO = os.environ.get("APPLY_URL_SHIGYO", "").strip()
-APPLY_URL_GENERAL = os.environ.get("APPLY_URL_GENERAL", "").strip()
-# 後方互換: APPLY_URL のみ設定された場合は両方に使う
-_legacy_apply_url = os.environ.get("APPLY_URL", "https://lantern-labo.com/apply").strip()
-if not APPLY_URL_SHIGYO:
-    APPLY_URL_SHIGYO = _legacy_apply_url
-if not APPLY_URL_GENERAL:
-    APPLY_URL_GENERAL = _legacy_apply_url
+
+# 申込URL: GitHub Secretsから取得、なければ既定値を使う
+DEFAULT_APPLY_URL_SHIGYO = "https://docs.google.com/forms/d/e/1FAIpQLSd3MfH4rxJhMdJrrFdnJ38kA1HgP8VCIIpHlxhJQ92IuhxBhQ/viewform"
+DEFAULT_APPLY_URL_GENERAL = "https://docs.google.com/forms/d/e/1FAIpQLSckC4VQ43pAo0MJlXq9b0pdLCllGLxvdpe59JJCtAWnP9KSbg/viewform"
+
+APPLY_URL_SHIGYO = os.environ.get("APPLY_URL_SHIGYO", "").strip() or DEFAULT_APPLY_URL_SHIGYO
+APPLY_URL_GENERAL = os.environ.get("APPLY_URL_GENERAL", "").strip() or DEFAULT_APPLY_URL_GENERAL
 
 # プロンプトや本文に埋め込むために整形した「2つのURL」ブロック
 APPLY_URLS_BLOCK = f"""🏢 士業の方:
@@ -516,20 +514,9 @@ news/最新ニュースは「問題提起のフック」として使い、本題
 - シーン例: 若手税理士がノートPCで通達原文を読み込む / 若手弁護士が同僚と立ち話 /
    若手社労士がスマホで助成金情報をチェック など、「明るく前向きで挑戦している若手」を感じさせる構図
 
-【出力形式】
-以下のJSON形式のみで返答(前置き・後置き・コードブロック不要):
-
-{{
-  "news_title": "ピックアップしたニュースの見出し",
-  "news_summary": "ニュース要点(150字程度)",
-  "source_name": "出典サイト名",
-  "source_url": "https://...",
-  "news_date": "YYYY-MM-DD または 不明",
-  "twitter": "X投稿本文(140字以内)",
-  "instagram": "Instagram投稿本文",
-  "facebook": "Facebook投稿本文",
-  "image_prompt": "英語の画像生成プロンプト"
-}}
+【出力形式 - 重要】
+**必ず submit_sns_posts ツールを呼び出して結果を返してください。**
+テキストでJSONを書かないでください。ツールの引数として各フィールド(news_title, news_summary, source_name, source_url, news_date, twitter, instagram, facebook, image_prompt)を渡してください。
 
 参考ハッシュタグ: {hashtags_str} #らんたんLABO #士業
 """
@@ -654,20 +641,9 @@ def _build_noon_prompt(shigyo, now, date_str):
 - シーン例: 若手士業がランチ中にスマホをチラ見 / カフェで弁当を開ける若手 /
    ランチ中に同僚と笑顔で話す若手など
 
-【出力形式】
-以下のJSON形式のみで返答(前置き・後置き・コードブロック不要):
-
-{{
-  "news_title": "選んだテーマ・話題の見出し",
-  "news_summary": "話題の要点(150字程度)",
-  "source_name": "出典サイト名",
-  "source_url": "https://...",
-  "news_date": "YYYY-MM-DD または 不明",
-  "twitter": "X投稿本文(140字以内)",
-  "instagram": "Instagram投稿本文",
-  "facebook": "Facebook投稿本文",
-  "image_prompt": "英語の画像生成プロンプト"
-}}
+【出力形式 - 重要】
+**必ず submit_sns_posts ツールを呼び出して結果を返してください。**
+テキストでJSONを書かないでください。ツールの引数として各フィールド(news_title, news_summary, source_name, source_url, news_date, twitter, instagram, facebook, image_prompt)を渡してください。
 
 参考ハッシュタグ: {hashtags_str}
 """
@@ -692,7 +668,11 @@ def call_claude(shigyo, slot, now):
 最終的には「他士業と交流したい」「異業種ゲストの講演を聞きたい」と思わせる
 投稿を作成してください。
 
-最後は必ず submit_sns_posts ツールを呼び出して結果を提出してください。"""
+【重要・厳守】
+1. まず web_search ツールで最新情報を集める
+2. **必ず最後に submit_sns_posts ツールを呼び出して結果を提出すること**
+3. テキストでJSON文字列を返してはいけない。必ずツール呼び出しで返す
+4. JSON形式のテキストは出力しない。submit_sns_posts ツールの引数として全フィールドを渡す"""
 
     user_prompt = build_prompt(shigyo, slot, now)
 
@@ -953,6 +933,12 @@ def main():
     print(f"[INFO] Date: {now.isoformat()}")
     print(f"[INFO] Shigyo: {shigyo['name']}")
     print(f"[INFO] Slot:   {slot}")
+    # デバッグ: URL設定の確認
+    print(f"[DEBUG] APPLY_URL_SHIGYO  exists: {bool(APPLY_URL_SHIGYO)}, length: {len(APPLY_URL_SHIGYO)}")
+    print(f"[DEBUG] APPLY_URL_GENERAL exists: {bool(APPLY_URL_GENERAL)}, length: {len(APPLY_URL_GENERAL)}")
+    print(f"[DEBUG] APPLY_URL_SHIGYO  starts: {APPLY_URL_SHIGYO[:30] if APPLY_URL_SHIGYO else '(empty)'}")
+    print(f"[DEBUG] APPLY_URL_GENERAL starts: {APPLY_URL_GENERAL[:30] if APPLY_URL_GENERAL else '(empty)'}")
+    print(f"[DEBUG] FLYER_IMAGE_URL   length: {len(FLYER_IMAGE_URL)}")
 
     article = call_claude(shigyo, slot, now)
     print(f"[INFO] News: {article.get('news_title')}")
