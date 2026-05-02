@@ -16,6 +16,7 @@
 import os
 import sys
 import json
+import re
 import urllib.parse
 from datetime import datetime, timezone, timedelta
 
@@ -506,25 +507,37 @@ news/最新ニュースは「問題提起のフック」として使い、本題
 - ハッシュタグ5-8個
 
 【4. 画像プロンプト(英語)】
-**人物は写さない**でください(顔の表情で印象が変わるリスクを避け、清潔感のある抽象的シーンを優先)。
-「繋がり・温かみ・明るさ・前向きさ」を象徴する写真を、本物の写真に見えるように生成。
+**人物・人体のパーツ(手・指・腕・脚・後ろ姿など)を一切写さない**でください。
+AI画像生成は手・指の描画が極端に苦手で、不自然になりやすいため、完全に避けます。
+記事内容に合った、温かく前向きな雰囲気の**静物・空間・風景写真**を生成。
 **AIっぽさを徹底排除**。以下のテクニックを必ず使用:
-- **構図テーマ(人物なし)**: 以下から記事内容に合うものを選ぶ
-   - "warm Japanese paper lantern (washi lamp) glowing softly in modern office, dusk window light"
-   - "two coffee mugs on minimalist wooden cafe table, hands of two people meeting (cropped above wrist, no face)"
-   - "blurred warm city lights at dusk, modern Tokyo office window reflection"
-   - "open notebook with pen, soft natural daylight, warm cream tones"
-   - "modern Japanese conference room, empty chairs arranged in a circle, soft afternoon light"
-   - "glowing warm-toned lantern paper craft on wooden surface, shallow depth"
-   - "cozy meeting space interior, plants and books, warm window light"
+
+【絶対NGワード(プロンプトに含めてはいけない)】
+× hand / hands / finger / fingers / arm / arms / leg / legs
+× person / people / man / woman / human / portrait / face
+× holding / reaching / touching / pointing
+× shaking hands(握手の構図は禁止)
+
+【推奨構図(人体パーツなし。以下から記事内容に合うものを1つ選ぶ)】
+- "warm Japanese washi paper lantern (akari) glowing softly on wooden desk, dusk window light, modern minimal Tokyo office in soft focus"
+- "two empty ceramic coffee mugs on minimalist wooden cafe table, soft afternoon light through window, no people"
+- "blurred warm city lights at dusk through Tokyo office window, modern interior reflection"
+- "open notebook with fountain pen on warm cream-colored desk, soft natural daylight"
+- "modern Japanese conference room interior, empty chairs arranged in a circle around table, soft afternoon light, no people"
+- "cozy reading corner with stacked books and small plant, warm window light, no people"
+- "rows of bookshelves in modern co-working space, warm pendant lights, no people"
+- "Tokyo office window at golden hour, view of buildings, soft warm tones, interior frame"
+- "wooden desk with laptop closed, coffee mug, plant in pot, calm afternoon light, top-down or angled view, no people"
+
+【撮影スタイル】
 - カメラ・フィルム指定: "Shot on Fujifilm X100V, 35mm, Provia film stock, slight film grain"
-- ドキュメンタリー調: "candid still life photography, photojournalism style"
+- ドキュメンタリー・スチール調: "candid still life photography, no subject, photojournalism aesthetic"
 - 自然光: "natural diffused daylight" / "warm afternoon glow" / "soft window light"
-   (× cinematic, × dramatic, × epic, × glowing は禁止ワード)
+   (× cinematic, × dramatic, × epic は禁止ワード)
 - 構図: "off-center composition", "asymmetric framing"
-- 不完全さ: "natural texture, ordinary moment, slight imperfections"
+- 不完全さ: "natural texture, ordinary moment, slight imperfections, dust motes in light"
 - 60〜90語以内、英語のみ
-- 「明るい」「前向き」「温かい」「繋がり」「学び」を感じさせるシンボリックな構図を選ぶ
+- 雰囲気: 「明るい」「前向き」「温かい」「繋がりや学びを暗示する空間」を選ぶ
 
 【出力形式 - 重要】
 **必ず submit_sns_posts ツールを呼び出して結果を返してください。**
@@ -648,21 +661,31 @@ def _build_noon_prompt(shigyo, now, date_str):
 - イベント誘導は文末で軽く
 
 【4. 画像プロンプト(英語)】
-**人物は写さない**でください。ランチタイムらしい温かい雰囲気の象徴的な静物・空間写真を生成。
-**AIっぽさを徹底排除**。以下のテクニックを必ず使用:
-- **構図テーマ(人物なし)**: 以下から記事内容に合うものを選ぶ
-   - "Japanese bento box on wooden cafe table, soft midday light, warm tones"
-   - "steaming coffee cup beside open laptop, blurred cozy cafe interior"
-   - "Japanese lunch set with chopsticks on natural wooden table, soft window light"
-   - "warm Japanese paper lantern in cafe corner, plants nearby, midday glow"
-   - "modern minimal Tokyo cafe interior, empty chair, plants, soft natural light"
+**人物・人体のパーツ(手・指・腕・脚・後ろ姿など)を一切写さない**でください。
+AI画像生成は手・指の描画が極端に苦手で、不自然になりやすいため、完全に避けます。
+ランチタイムらしい温かい雰囲気の**静物・空間写真**を生成。
+
+【絶対NGワード(プロンプトに含めてはいけない)】
+× hand / hands / finger / fingers / arm / arms / leg / legs
+× person / people / man / woman / human / portrait / face
+× holding / reaching / touching / pointing
+
+【推奨構図(人体パーツなし。以下から1つ選ぶ)】
+- "Japanese bento box neatly arranged on wooden cafe table, soft midday window light, warm earthy tones, top-down view, no people"
+- "steaming ceramic coffee cup beside open laptop on cafe table, blurred cozy interior background, no people"
+- "Japanese lunch set with chopsticks neatly placed on natural wooden table, soft window light, no people"
+- "warm Japanese paper lantern (akari) softly lit in cafe corner, plants nearby, midday glow, no people"
+- "modern minimal Tokyo cafe interior, empty chair, plants on shelves, soft natural light, no people"
+- "small notebook and pen beside coffee cup on warm wooden desk, peaceful cafe atmosphere, no people"
+
+【撮影スタイル】
 - カメラ・フィルム指定: "Shot on Fujifilm X100V, 35mm, Provia film stock, slight grain"
-- ドキュメンタリー調: "candid still life photography, snapshot moment"
+- ドキュメンタリー・スチール調: "candid still life photography, no subject"
 - 自然光: "natural midday light" / "soft window light" (× cinematic, × dramatic は禁止)
 - 構図: "off-center composition", "asymmetric framing"
 - 不完全さ: "natural texture, ordinary moment, slight imperfections"
 - 60〜90語以内、英語のみ
-- 「ほっと一息」「温かい」「日常の小さな幸せ」を感じさせる構図
+- 雰囲気: 「ほっと一息」「温かい」「日常の小さな幸せ」を感じさせる構図
 
 【出力形式 - 重要】
 **必ず submit_sns_posts ツールを呼び出して結果を返してください。**
@@ -810,7 +833,24 @@ def call_claude(shigyo, slot, now):
 # ============================================================
 
 def build_image_url(prompt, seed=None):
-    encoded = urllib.parse.quote(prompt)
+    # 念のためAIが描画を苦手とするNGワードを除去(プロンプト指示が無視された場合の保険)
+    ng_words = [
+        "hand", "hands", "finger", "fingers", "arm", "arms", "leg", "legs",
+        "holding", "reaching", "touching", "pointing", "shaking hands",
+        "person", "people", "man", "woman", "human", "portrait", "face",
+        "young Japanese", "professional in", "businessperson",
+    ]
+    cleaned_prompt = prompt
+    for ng in ng_words:
+        # 単語境界を考慮した除去
+        cleaned_prompt = re.sub(rf"\b{re.escape(ng)}\b", "", cleaned_prompt, flags=re.IGNORECASE)
+    # 余分な空白・カンマを整理
+    cleaned_prompt = re.sub(r"\s*,\s*,+", ",", cleaned_prompt)
+    cleaned_prompt = re.sub(r"\s+", " ", cleaned_prompt).strip()
+    # ポジティブな構図ワードを末尾に追加(空にならないよう)
+    cleaned_prompt += ", warm still life photography, no people, peaceful interior"
+
+    encoded = urllib.parse.quote(cleaned_prompt)
     seed = seed or int(datetime.now().timestamp())
     return (
         f"https://image.pollinations.ai/prompt/{encoded}"
