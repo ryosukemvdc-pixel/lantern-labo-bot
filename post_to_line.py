@@ -689,9 +689,33 @@ def call_claude(shigyo, slot, now):
 - 昼は士業業界全体向けの軽い読み物コンテンツ
 
 最終的には「他士業と交流したい」「異業種ゲストの講演を聞きたい」と思わせる
-投稿を作成してください。"""
+投稿を作成してください。
+
+最後は必ず submit_sns_posts ツールを呼び出して結果を提出してください。"""
 
     user_prompt = build_prompt(shigyo, slot, now)
+
+    # tool_use を使うことで、構造化された JSON 出力を保証する
+    submit_tool = {
+        "name": "submit_sns_posts",
+        "description": "生成したSNS投稿セットを構造化データとして提出します。Web検索で最新情報を集めた後、必ずこのツールを呼んで結果を返してください。",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "news_title": {"type": "string", "description": "ピックアップしたニュース・話題の見出し"},
+                "news_summary": {"type": "string", "description": "ニュース・話題の要点(150字程度)"},
+                "source_name": {"type": "string", "description": "出典サイト名"},
+                "source_url": {"type": "string", "description": "出典URL"},
+                "news_date": {"type": "string", "description": "ニュースの日付 YYYY-MM-DD または 不明"},
+                "twitter": {"type": "string", "description": "X(Twitter)用投稿本文(全角140字以内)"},
+                "instagram": {"type": "string", "description": "Instagram用投稿本文"},
+                "facebook": {"type": "string", "description": "Facebook用投稿本文"},
+                "image_prompt": {"type": "string", "description": "Pollinations.ai用の英語画像生成プロンプト"},
+            },
+            "required": ["news_title", "news_summary", "source_name", "source_url",
+                         "twitter", "instagram", "facebook", "image_prompt"],
+        },
+    }
 
     payload = {
         "model": "claude-sonnet-4-5",
@@ -699,8 +723,10 @@ def call_claude(shigyo, slot, now):
         "system": system_prompt,
         "messages": [{"role": "user", "content": user_prompt}],
         "tools": [
-            {"type": "web_search_20250305", "name": "web_search", "max_uses": 5}
+            {"type": "web_search_20250305", "name": "web_search", "max_uses": 5},
+            submit_tool,
         ],
+        "tool_choice": {"type": "auto"},
     }
     headers = {
         "x-api-key": ANTHROPIC_API_KEY,
@@ -717,52 +743,36 @@ def call_claude(shigyo, slot, now):
         raise RuntimeError(f"Anthropic API error {r.status_code}: {r.text[:500]}")
 
     data = r.json()
+
+    # tool_use ブロックから submit_sns_posts の入力を取り出す
+    for block in data.get("content", []):
+        if block.get("type") == "tool_use" and block.get("name") == "submit_sns_posts":
+            return block["input"]
+
+    # tool_use が見つからなかった場合は、テキストブロックからJSONを取り出すフォールバック
     text_blocks = [b["text"] for b in data["content"] if b.get("type") == "text"]
     full_text = "\n".join(text_blocks)
+    print(f"[WARN] No tool_use found, falling back to text JSON parse")
+    print(f"[WARN] Response text (first 500 chars): {full_text[:500]}")
 
     cleaned = full_text.replace("```json", "").replace("```", "").strip()
     start = cleaned.find("{")
     end = cleaned.rfind("}")
     if start == -1 or end == -1:
-        raise RuntimeError(f"No JSON found in response: {full_text[:500]}")
+        raise RuntimeError(f"No JSON or tool_use found in response: {full_text[:500]}")
 
     json_str = cleaned[start : end + 1]
 
-    # JSONパースを試みる(失敗時はフォールバック処理)
     try:
         return json.loads(json_str)
-    except json.JSONDecodeError as e:
-        # よくある問題: Claudeが本文中にエスケープされていない引用符や改行を含めてしまう
-        # 1. 試み: strict=False で寛容にパース
+    except json.JSONDecodeError:
         try:
             return json.loads(json_str, strict=False)
-        except json.JSONDecodeError:
-            pass
-
-        # 2. 試み: フィールド単位で正規表現で抽出
-        import re
-        result = {}
-        fields = ["news_title", "news_summary", "source_name", "source_url",
-                  "news_date", "twitter", "instagram", "facebook", "image_prompt"]
-        for field in fields:
-            # "field": "value" or "field": "value", を抽出(改行込みOK)
-            pattern = rf'"{field}"\s*:\s*"((?:[^"\\]|\\.)*)"'
-            m = re.search(pattern, json_str, re.DOTALL)
-            if m:
-                value = m.group(1)
-                # エスケープ解除
-                value = value.replace('\\n', '\n').replace('\\"', '"').replace("\\\\", "\\")
-                result[field] = value
-
-        if not result.get("twitter"):
-            # それでもダメなら元のエラーで失敗
+        except json.JSONDecodeError as e:
             raise RuntimeError(
-                f"JSON parse failed: {e}\n"
-                f"First 500 chars of response: {full_text[:500]}"
+                f"All JSON parse attempts failed: {e}\n"
+                f"Response (first 1000 chars): {full_text[:1000]}"
             )
-
-        print(f"[WARN] JSON parse failed, recovered with regex: {e}")
-        return result
 
 
 # ============================================================
