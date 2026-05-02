@@ -1,12 +1,11 @@
 """
 らんたんLABO 士業向けSNS自動配信ボット (イベント集客特化版)
 ================================
-毎日3回、LINEに以下を配信:
-  - 朝8時 (JST): 一般ニュースサイト中心(1業種フォーカス)
-  - 昼12時(JST): 士業業界全体向け軽い読み物
-  - 夕方17時(JST): 公的機関中心(1業種フォーカス)
+毎日2回、LINEに以下を配信:
+  - 朝8時 (JST): 一般ニュースサイト中心
+  - 夕方17時(JST): 公的機関中心
 
-各回、X(Twitter)・Instagram・Facebook用に最適化された3つの投稿文 + 画像 + チラシを一括配信。
+各回、X(Twitter)・Instagram・Facebook用に最適化された3つの投稿文 + 画像を一括配信。
 ニュースを「問題提起のフック」として、らんたんLABO Opening Session への参加申込に
 誘導する構成。
 
@@ -727,7 +726,43 @@ def call_claude(shigyo, slot, now):
     if start == -1 or end == -1:
         raise RuntimeError(f"No JSON found in response: {full_text[:500]}")
 
-    return json.loads(cleaned[start : end + 1])
+    json_str = cleaned[start : end + 1]
+
+    # JSONパースを試みる(失敗時はフォールバック処理)
+    try:
+        return json.loads(json_str)
+    except json.JSONDecodeError as e:
+        # よくある問題: Claudeが本文中にエスケープされていない引用符や改行を含めてしまう
+        # 1. 試み: strict=False で寛容にパース
+        try:
+            return json.loads(json_str, strict=False)
+        except json.JSONDecodeError:
+            pass
+
+        # 2. 試み: フィールド単位で正規表現で抽出
+        import re
+        result = {}
+        fields = ["news_title", "news_summary", "source_name", "source_url",
+                  "news_date", "twitter", "instagram", "facebook", "image_prompt"]
+        for field in fields:
+            # "field": "value" or "field": "value", を抽出(改行込みOK)
+            pattern = rf'"{field}"\s*:\s*"((?:[^"\\]|\\.)*)"'
+            m = re.search(pattern, json_str, re.DOTALL)
+            if m:
+                value = m.group(1)
+                # エスケープ解除
+                value = value.replace('\\n', '\n').replace('\\"', '"').replace("\\\\", "\\")
+                result[field] = value
+
+        if not result.get("twitter"):
+            # それでもダメなら元のエラーで失敗
+            raise RuntimeError(
+                f"JSON parse failed: {e}\n"
+                f"First 500 chars of response: {full_text[:500]}"
+            )
+
+        print(f"[WARN] JSON parse failed, recovered with regex: {e}")
+        return result
 
 
 # ============================================================
