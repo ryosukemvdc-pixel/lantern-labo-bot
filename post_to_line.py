@@ -35,19 +35,13 @@ LINE_TARGET_ID_3 = os.environ.get("LINE_TARGET_ID_3", "").strip()
 # 全配信先IDのリスト(空でないものだけ)
 LINE_TARGET_IDS = [tid for tid in [LINE_TARGET_ID, LINE_TARGET_ID_2, LINE_TARGET_ID_3] if tid]
 
-# 申込URL: GitHub Secretsから取得、なければ既定値を使う
-DEFAULT_APPLY_URL_SHIGYO = "https://docs.google.com/forms/d/e/1FAIpQLSd3MfH4rxJhMdJrrFdnJ38kA1HgP8VCIIpHlxhJQ92IuhxBhQ/viewform"
-DEFAULT_APPLY_URL_GENERAL = "https://docs.google.com/forms/d/e/1FAIpQLSckC4VQ43pAo0MJlXq9b0pdLCllGLxvdpe59JJCtAWnP9KSbg/viewform"
+# 申込URL: 統一Linktree(GitHub Secretsで上書き可能)
+DEFAULT_APPLY_URL = "https://linktr.ee/ryosuke.mvdc"
+APPLY_URL = os.environ.get("APPLY_URL", "").strip() or DEFAULT_APPLY_URL
 
-APPLY_URL_SHIGYO = os.environ.get("APPLY_URL_SHIGYO", "").strip() or DEFAULT_APPLY_URL_SHIGYO
-APPLY_URL_GENERAL = os.environ.get("APPLY_URL_GENERAL", "").strip() or DEFAULT_APPLY_URL_GENERAL
-
-# プロンプトや本文に埋め込むために整形した「2つのURL」ブロック
-APPLY_URLS_BLOCK = f"""🏢 士業の方:
-{APPLY_URL_SHIGYO}
-
-👤 一般の方:
-{APPLY_URL_GENERAL}"""
+# プロンプトや本文に埋め込むためのURLブロック
+APPLY_URLS_BLOCK = f"""👇 お申込み・詳細はこちら(士業/一般 両対応)
+{APPLY_URL}"""
 
 # イベントチラシのHTTPS画像URL(任意)
 FLYER_IMAGE_URL = os.environ.get("FLYER_IMAGE_URL", "").strip()
@@ -440,12 +434,12 @@ news/最新ニュースは「問題提起のフック」として使い、本題
 - ✅ ハッシュタグ用の `#` は **末尾のハッシュタグ部分でのみ** 使用OK
 
 【申込URLの扱い - 重要】
-申込URLは士業用と一般用の2種類があり、コード側で自動的に投稿末尾に追加されます。
+申込URLは1つの統一Linktree URLで、コード側が自動的に投稿末尾に追加します。
 **本文中にURL文字列(例: https://〜)を絶対に書かないでください。**
-- ❌ NG: 「申込→ https://forms.gle/...」「URL: https://example.com」など本文に書く
-- ❌ NG: 「https://forms.gle/士業用」のようなプレースホルダーを書く
+- ❌ NG: 「申込→ https://...」「URL: https://example.com」など本文に書く
+- ❌ NG: 「https://forms.gle/...」のようなプレースホルダーを書く
 - ✅ OK: 「申込はこの投稿の末尾から」「お申込みはプロフィールのリンクから」「詳細は下記参照」
-※ 投稿の末尾には自動で「🏢士業の方: URL / 👤一般の方: URL」が追加されるため、本文では誘導文だけでOK
+※ 投稿の末尾にはコードが自動でLinktreeリンクを追加するため、本文では誘導文だけでOK
 
 【らんたんLABO Opening Session 詳細】
 - 日時: {EVENT_INFO["date"]}
@@ -454,8 +448,7 @@ news/最新ニュースは「問題提起のフック」として使い、本題
 - テーマ: {EVENT_INFO["themes"]}
 - 参加費: 士業 {EVENT_INFO["fee_shigyo"]} / 一般 {EVENT_INFO["fee_general"]}
 - 主催: {EVENT_INFO["organizer"]} ({EVENT_INFO["leaders"]})
-- 申込URL(士業): {APPLY_URL_SHIGYO}
-- 申込URL(一般): {APPLY_URL_GENERAL}
+- 申込URL(士業/一般 両対応): {APPLY_URL}
 - **本日時点でのイベントまでのカウントダウン**: {countdown_for_prompt}
 
 【カウントダウンの活用】
@@ -497,18 +490,23 @@ news/最新ニュースは「問題提起のフック」として使い、本題
 【2. Instagram用投稿(キャプション)】
 - **800〜1,200字程度**
 - 1行目に強烈なフック(絵文字使用OK・🚨📊⚠️📰など)
-- 段落構成: 問題提起 → 共感(孤独感・限界感) → イベント紹介 → ゲスト紹介(2名) → 他士業交流の魅力 → CTA
-- ゲスト2名の経歴・魅力を具体的に書く(吉本興業・落語作家など、目を引くキーワードを活かす)
+- 段落構成: 問題提起 → 共感(孤独感・限界感) → イベントへの誘導(詳細は書かず魅力だけ匂わす) → CTA
+- **イベント詳細(日時・会場・参加費・URL等)を本文に書かない**(投稿末尾にコードが自動追加するため)
+- 本文では「6/19のあのイベントで◯◯氏(吉本元社長)の話が聞ける」「他士業と語り合える」など、魅力だけ書く
+- ゲスト名・経歴に触れるのはOK(吉本興業・落語作家など、目を引くキーワードを活かす)
 - 「保存推奨」「シェアしてね」など Instagram文化に合う表現も
 - 末尾に検索ヒット重視のハッシュタグ **15個程度**
 - 「プロフィールのリンクから申込み✨」で誘導
 
-【3. Facebook用投稿】
+【3. Facebook用投稿 - 重要】
 - **600〜900字程度**
 - 専門家としての知見を感じさせる落ち着いた文体
 - 絵文字は控えめ
-- 段落構成: 問題提起→現状分析→なぜ繋がりが必要か→イベント詳細(ゲスト含む)→申込み誘導
-- **本文にはURLを書かない**(コードが末尾に自動追加)
+- 段落構成: 問題提起→現状分析→なぜ繋がりが必要か→イベントへの軽い誘導
+- **FacebookはURL投稿に厳しい制限があるため、本文中に絶対にURLを書かないこと**
+- **イベント詳細(日時・会場・参加費)も本文に書かない**(誘導はソフトに)
+- 申込誘導は必ず「お申込みは弊社プロフィール欄のURLから」「詳しくはプロフィールから」のような文言に
+- 本文では「6/19にあのイベントが」「水谷氏の話が聞ける」など、魅力だけ書く
 - ハッシュタグ5-8個
 
 【4. 画像プロンプト(英語)】
@@ -620,8 +618,7 @@ def _build_noon_prompt(shigyo, now, date_str):
 - テーマ: {EVENT_INFO["themes"]}
 - 参加費: 士業 {EVENT_INFO["fee_shigyo"]} / 一般 {EVENT_INFO["fee_general"]}
 - 主催: {EVENT_INFO["organizer"]} ({EVENT_INFO["leaders"]})
-- 申込URL(士業): {APPLY_URL_SHIGYO}
-- 申込URL(一般): {APPLY_URL_GENERAL}
+- 申込URL(士業/一般 両対応): {APPLY_URL}
 - **本日時点でのイベントまでのカウントダウン**: {countdown_for_prompt}
 
 【カウントダウンの活用】
@@ -655,14 +652,18 @@ def _build_noon_prompt(shigyo, now, date_str):
 - ストーリー仕立て・データの可視化・引用などで飽きさせない構成
 - 「保存推奨」「シェアしたい」と思わせる工夫
 - 末尾にハッシュタグ12個程度
-- イベント誘導は最後の2-3行でさりげなく
+- **イベント詳細(日時・会場・参加費・URL等)を本文に書かない**(投稿末尾にコードが自動追加)
+- イベント誘導は最後の2-3行で「こういう話、6/19の場で他士業と」とソフトに
 
-【3. Facebook用投稿】
+【3. Facebook用投稿 - 重要】
 - **500〜700字程度**
 - ランチタイムに知的好奇心を刺激する読み物
 - 個人的な体験談・観察・問いかけを織り交ぜた語り口
 - 絵文字は1〜2個に抑制
 - ハッシュタグ5-7個
+- **FacebookはURL投稿に厳しい制限があるため、本文中に絶対にURLを書かないこと**
+- **イベント詳細(日時・会場・参加費)も本文に書かない**
+- 申込誘導は必ず「お申込みは弊社プロフィール欄のURLから」のような文言に
 - イベント誘導は文末で軽く
 
 【4. 画像プロンプト(英語)】
@@ -901,19 +902,46 @@ def compose_messages(article, shigyo, slot, image_url, now=None):
 🎯 テーマ: {EVENT_INFO["themes"]}
 💴 士業 {EVENT_INFO["fee_shigyo"]} / 一般 {EVENT_INFO["fee_general"]}
 
-👇 お申込みはこちら
 {APPLY_URLS_BLOCK}"""
 
-    # ----- Header (overview) -----
-    header = f"""{slot_emoji} {slot_label} SNS投稿セット
-━━━━━━━━━━━━━━━
+    # ----- Header (LINE通知のプレビューに最初に表示される部分) -----
+    # ニュースタイトルを冒頭に置いて、通知音と一緒に表示される段階で「読みたい!」と思わせる
+    if slot == "morning":
+        opener_options = [
+            "おはようございます☀️",
+            "おはよう!今日もいい朝に",
+            "☀️ おはようございます。コーヒー片手にどうぞ",
+            "おはようございます☕ 朝イチ情報、温かいうちに",
+            "☀️ おはよう。今日も士業界、にぎやかですよ",
+        ]
+    elif slot == "noon":
+        opener_options = [
+            "🍱 お疲れさまです。お昼の小ネタを1つ",
+            "ランチのお供にどうぞ☕",
+            "🍱 お昼休み、5分だけお邪魔します",
+            "コーヒー片手に、今日の業界トピック",
+            "🍱 ちょっと話したくなる小話を",
+        ]
+    else:
+        opener_options = [
+            "🌙 お疲れさまでした",
+            "🌙 一日の終わりに、明日に活かす情報を",
+            "夕方の一息、いかがでしょう🌙",
+            "🌙 今日もお疲れさま。専門家としての知見を1つ",
+            "🌙 今日のしめくくりに",
+        ]
+    # ニュースタイトルのハッシュ値で日替わり選択(同日内は同じ、日が変われば変わる)
+    opener = opener_options[hash(news_title or "x") % len(opener_options)]
 
-📰 フックに使うニュース・話題
-{news_title}
+    header = f"""{opener}
 
-📎 出典: {source_name}
+📰 {news_title}
+
+📎 {source_name}
 {source_url}
 
+━━━━━━━━━━━━━━━
+{slot_emoji} {slot_label} の SNS投稿セット
 ━━━━━━━━━━━━━━━
 このあと X / Instagram / Facebook 用の
 投稿が順に届きます👇 各投稿をコピペして
@@ -936,7 +964,21 @@ SNSに貼り付けてご利用ください。"""
 ━━━━━━━━
 {event_block}"""
 
-    # ----- Facebook -----
+    # ----- Facebook (URLは載せない・プロフィール欄誘導) -----
+    # Facebookは月にURLを載せられる回数に制限があるため、本文内・末尾とも申込URLは省く
+    # 代わりに「プロフィール欄のURLから」と誘導
+    facebook_event_short = f"""【らんたんLABO Opening Session】
+🏮 {EVENT_INFO["tagline"]}{countdown_line}
+📅 {EVENT_INFO["date"]}
+📍 {EVENT_INFO["venue"]}
+🎤 ゲスト:
+   ・{EVENT_INFO["guest_1"]["name"]} ({EVENT_INFO["guest_1"]["title"]})
+   ・{EVENT_INFO["guest_2"]["name"]} (落語作家)
+🎯 テーマ: {EVENT_INFO["themes"]}
+💴 士業 {EVENT_INFO["fee_shigyo"]} / 一般 {EVENT_INFO["fee_general"]}
+
+👉 お申込みはプロフィール欄のURLから"""
+
     facebook_msg = f"""━━━━━━━━━━━━━━━
 📘 Facebook用 ({len(facebook_text)}字)
 ━━━━━━━━━━━━━━━
@@ -944,7 +986,7 @@ SNSに貼り付けてご利用ください。"""
 {facebook_text}
 
 ━━━━━━━━
-{event_block}"""
+{facebook_event_short}"""
 
     def trim(text):
         return text if len(text) <= 4900 else text[:4850] + "...(以下省略)"
@@ -997,8 +1039,7 @@ def main():
     print(f"[INFO] Shigyo: {shigyo['name']}")
     print(f"[INFO] Slot:   {slot}")
     # デバッグ: URL設定の確認
-    print(f"[DEBUG] APPLY_URL_SHIGYO  exists: {bool(APPLY_URL_SHIGYO)}, length: {len(APPLY_URL_SHIGYO)}")
-    print(f"[DEBUG] APPLY_URL_GENERAL exists: {bool(APPLY_URL_GENERAL)}, length: {len(APPLY_URL_GENERAL)}")
+    print(f"[DEBUG] APPLY_URL exists: {bool(APPLY_URL)}, value: {APPLY_URL}")
     print(f"[DEBUG] LINE_TARGET_IDS count: {len(LINE_TARGET_IDS)}")
 
     article = call_claude(shigyo, slot, now)
